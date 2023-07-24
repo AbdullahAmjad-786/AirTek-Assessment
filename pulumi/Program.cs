@@ -35,7 +35,6 @@ class Program
             // Create a new ECR
             var repo = new Awsx.Ecr.Repository("airTek-repo", new()
             {
-                ForceDelete = true,
                 Tags = tags,
             });
 
@@ -118,7 +117,7 @@ class Program
             }) ; 
 
             // Kubernetes namespace for the web app and API
-            var webAppNamespace = new Kubernetes.Core.V1.Namespace("airTek-dev", new NamespaceArgs
+            var webAppNamespace = new Kubernetes.Core.V1.Namespace("airTek-namespace", new NamespaceArgs
             {
                 Metadata = new ObjectMetaArgs
                 {
