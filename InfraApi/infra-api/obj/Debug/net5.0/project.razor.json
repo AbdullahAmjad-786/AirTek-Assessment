@@ -1,0 +1,20 @@
+{
+  "SerializedFilePath": "c:\\Users\\EliteBook\\Documents\\Work\\Air-Tek\\infra-team-test\\infra-api\\obj\\Debug\\net5.0\\project.razor.json",
+  "FilePath": "c:\\Users\\EliteBook\\Documents\\Work\\Air-Tek\\infra-team-test\\infra-api\\infra-api.csproj",
+  "Configuration": {
+    "ConfigurationName": "MVC-3.0",
+    "LanguageVersion": "5.0",
+    "Extensions": [
+      {
+        "ExtensionName": "MVC-3.0"
+      }
+    ]
+  },
+  "ProjectWorkspaceState": {
+    "TagHelpers": [],
+    "CSharpLanguageVersion": 900
+  },
+  "RootNamespace": "infra_api",
+  "Documents": [],
+  "SerializationFormat": "0.3"
+}

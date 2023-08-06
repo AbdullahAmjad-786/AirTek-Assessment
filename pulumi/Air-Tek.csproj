@@ -12,6 +12,7 @@
     <PackageReference Include="Pulumi.Awsx" Version="1.0.2" />
     <PackageReference Include="Pulumi.Eks" Version="1.0.2" />
     <PackageReference Include="Pulumi.Kubernetes" Version="4.0.3" />
+    <PackageReference Include="Pulumi.KubernetesIngressNginx" Version="0.0.10" />
   </ItemGroup>
 
 </Project>

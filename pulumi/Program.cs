@@ -9,9 +9,9 @@ using Awsx = Pulumi.Awsx;
 using Kubernetes = Pulumi.Kubernetes;
 using Pulumi.Kubernetes.Types.Inputs.Meta.V1;
 using Pulumi.Kubernetes.Types.Inputs.Core.V1;
-using Pulumi.Kubernetes.Helm;
-using Pulumi.Kubernetes.Types.Inputs.Extensions.V1Beta1;
+using Pulumi.Kubernetes.Types.Inputs.Networking.V1;
 using Pulumi.Eks;
+using nginx = Pulumi.KubernetesIngressNginx;
 
 class Program
 {
@@ -42,14 +42,14 @@ class Program
             var appImage = new Awsx.Ecr.Image("web-app-image", new()
             {
                 RepositoryUrl = repo.Url,
-                Path = "./infra-web",
+                Path = "../InfraWeb",
             });
 
             //Create & Push Image for Web Api
             var apiImage = new Awsx.Ecr.Image("web-api-image", new()
             {
                 RepositoryUrl = repo.Url,
-                Path = "./infra-api",
+                Path = "../InfraApi",
             });
 
             // Create a new VPC
@@ -114,30 +114,43 @@ class Program
             }, new ComponentResourceOptions
             {
                 Provider = eksProvider,
-            }) ; 
+            }) ;
 
-            // Kubernetes namespace for the web app and API
-            var webAppNamespace = new Kubernetes.Core.V1.Namespace("airTek-namespace", new NamespaceArgs
+            // Kubernetes namespace for the Ingress Controller
+            var ingressNamespace = new Kubernetes.Core.V1.Namespace("ingress-namespace", new NamespaceArgs
             {
                 Metadata = new ObjectMetaArgs
                 {
-                    Name = "airTek-prod",
+                    Name = "ingress-controller",
                 },
             }, new CustomResourceOptions
             {
                 Provider = eksProvider,
             });
 
-            // Install Nginx Ingress Controller using Helm
-            var nginxIngress = new Kubernetes.Helm.V3.Chart("nginx-ingress", new ChartArgs
+            // Kubernetes namespace for the web app and API
+            var webAppNamespace = new Kubernetes.Core.V1.Namespace("airTek-namespace", new NamespaceArgs
             {
-                Chart = "nginx-ingress",
-                Version = "4.0.0",
-                Namespace = "ingress-controller",
-                FetchOptions = new ChartFetchArgs
+                Metadata = new ObjectMetaArgs
                 {
-                    Repo = "https://charts.helm.sh/stable"
+                    Name = "airtek-prod",
                 },
+            }, new CustomResourceOptions
+            {
+                Provider = eksProvider,
+            });
+
+            // Kubernetes nginx ingress controller
+            var nginxIngress = new nginx.IngressController("nginx-ingress", new nginx.IngressControllerArgs 
+            {
+                 Controller = new nginx.Inputs.ControllerArgs
+                 {
+                    // ConfigMapNamespace = ingressNamespace.Metadata.Apply(meta => meta.Name),
+                     PublishService = new nginx.Inputs.ControllerPublishServiceArgs
+                     {
+                         Enabled = true,
+                     },
+                 },
             }, new ComponentResourceOptions
             {
                 Provider = eksProvider,
@@ -146,7 +159,7 @@ class Program
             // Deploy Web App
             var appDeployment = new Kubernetes.Apps.V1.Deployment("web-app", new()
             {
-                Metadata = new Kubernetes.Types.Inputs.Meta.V1.ObjectMetaArgs
+                Metadata = new ObjectMetaArgs
                 {
                     Namespace = webAppNamespace.Metadata.Apply(meta => meta.Name),
                     Labels =
@@ -156,37 +169,45 @@ class Program
                 },
                 Spec = new Kubernetes.Types.Inputs.Apps.V1.DeploymentSpecArgs
                 {
-                    Replicas = 3,
-                    Selector = new Kubernetes.Types.Inputs.Meta.V1.LabelSelectorArgs
+                    Replicas = 1,
+                    Selector = new LabelSelectorArgs
                     {
                         MatchLabels =
                         {
                             { "app", "web-app" },
                         },
                     },
-                    Template = new Kubernetes.Types.Inputs.Core.V1.PodTemplateSpecArgs
+                    Template = new PodTemplateSpecArgs
                     {
-                        Metadata = new Kubernetes.Types.Inputs.Meta.V1.ObjectMetaArgs
+                        Metadata = new ObjectMetaArgs
                         {
                             Labels =
                             {
                                 { "app", "web-app" },
                             },
                         },
-                        Spec = new Kubernetes.Types.Inputs.Core.V1.PodSpecArgs
+                        Spec = new PodSpecArgs
                         {
                             Containers = new[]
                             {
-                                new Kubernetes.Types.Inputs.Core.V1.ContainerArgs
+                                new ContainerArgs
                                 {
                                     Name = "web-app-container",
                                     Image = appImage.ImageUri,
+                                    Env = new[]
+                                    {
+                                        new EnvVarArgs
+                                        {
+                                            Name= "ApiAddress",
+                                            Value= "http://infra-api:80/WeatherForecast",
+                                        },
+                                    },
                                     Ports = new[]
                                     {
-                                        new Kubernetes.Types.Inputs.Core.V1.ContainerPortArgs
+                                        new ContainerPortArgs
                                         {
                                             Name = "http",
-                                            ContainerPortValue = 80,
+                                            ContainerPortValue = 5000,
                                         },
                                     },
                                 },
@@ -202,7 +223,7 @@ class Program
             // Deploy Web Api
             var apiDeployment = new Kubernetes.Apps.V1.Deployment("web-api", new()
             {
-                Metadata = new Kubernetes.Types.Inputs.Meta.V1.ObjectMetaArgs
+                Metadata = new ObjectMetaArgs
                 {
                     Namespace = webAppNamespace.Metadata.Apply(meta => meta.Name),
                     Labels =
@@ -212,37 +233,37 @@ class Program
                 },
                 Spec = new Kubernetes.Types.Inputs.Apps.V1.DeploymentSpecArgs
                 {
-                    Replicas = 3,
-                    Selector = new Kubernetes.Types.Inputs.Meta.V1.LabelSelectorArgs
+                    Replicas = 1,
+                    Selector = new LabelSelectorArgs
                     {
                         MatchLabels =
                         {
                             { "app", "web-api" },
                         },
                     },
-                    Template = new Kubernetes.Types.Inputs.Core.V1.PodTemplateSpecArgs
+                    Template = new PodTemplateSpecArgs
                     {
-                        Metadata = new Kubernetes.Types.Inputs.Meta.V1.ObjectMetaArgs
+                        Metadata = new ObjectMetaArgs
                         {
                             Labels =
                             {
                                 { "app", "web-api" },
                             },
                         },
-                        Spec = new Kubernetes.Types.Inputs.Core.V1.PodSpecArgs
+                        Spec = new PodSpecArgs
                         {
                             Containers = new[]
                             {
-                                new Kubernetes.Types.Inputs.Core.V1.ContainerArgs
+                                new ContainerArgs
                                 {
                                     Name = "web-api-container",
                                     Image = apiImage.ImageUri,
                                     Ports = new[]
                                     {
-                                        new Kubernetes.Types.Inputs.Core.V1.ContainerPortArgs
+                                        new ContainerPortArgs
                                         {
                                             Name = "http",
-                                            ContainerPortValue = 80,
+                                            ContainerPortValue = 5000,
                                         },
                                     },
                                 },
@@ -258,22 +279,23 @@ class Program
             //Deploy Web App Service
             var webAppService = new Kubernetes.Core.V1.Service("web-app-service", new()
             {
-                Metadata = new Kubernetes.Types.Inputs.Meta.V1.ObjectMetaArgs
+                Metadata = new ObjectMetaArgs
                 {
+                    Name      = "infra-app",
                     Namespace = webAppNamespace.Metadata.Apply(meta => meta.Name),
                     Labels =
                     {
                         { "app", "web-app" },
                     },
                 },
-                Spec = new Kubernetes.Types.Inputs.Core.V1.ServiceSpecArgs
+                Spec = new ServiceSpecArgs
                 {
                     Ports = new[]
                     {
-                        new Kubernetes.Types.Inputs.Core.V1.ServicePortArgs
+                        new ServicePortArgs
                         {
                             Port = 80,
-                            TargetPort = "http",
+                            TargetPort = 5000,
                         },
                     },
                     Selector =
@@ -289,22 +311,23 @@ class Program
             //Deploy Web Api Service
             var webApiService = new Kubernetes.Core.V1.Service("web-api-service", new()
             {
-                Metadata = new Kubernetes.Types.Inputs.Meta.V1.ObjectMetaArgs
+                Metadata = new ObjectMetaArgs
                 {
+                    Name      = "infra-api",
                     Namespace = webAppNamespace.Metadata.Apply(meta => meta.Name),
                     Labels =
                     {
                         { "app", "web-api" },
                     },
                 },
-                Spec = new Kubernetes.Types.Inputs.Core.V1.ServiceSpecArgs
+                Spec = new ServiceSpecArgs
                 {
                     Ports = new[]
                     {
-                        new Kubernetes.Types.Inputs.Core.V1.ServicePortArgs
+                        new ServicePortArgs
                         {
                             Port = 80,
-                            TargetPort = "http",
+                            TargetPort = 5000,
                         },
                     },
                     Selector =
@@ -318,14 +341,14 @@ class Program
             });
 
             // Ingress resource for the web app
-            var webAppIngress = new Kubernetes.Extensions.V1Beta1.Ingress("web-app-ingress", new IngressArgs
+            var webAppIngress = new Kubernetes.Networking.V1.Ingress("web-app-ingress", new()
             {
                 Metadata = new ObjectMetaArgs
                 {
                     Namespace = webAppNamespace.Metadata.Apply(meta => meta.Name),
-                    Annotations = new InputMap<string>
+                    Annotations =
                     {
-                        { "nginx.ingress.kubernetes.io/rewrite-target", "/" },
+                        { "kubernetes.io/ingress.class", "nginx" },
                     },
                 },
                 Spec = new IngressSpecArgs
@@ -334,19 +357,26 @@ class Program
                     {
                         new IngressRuleArgs
                         {
-                            Host = "airtek-web-app.com", 
+                           // Host = "airtek-web-app.com",
                             Http = new HTTPIngressRuleValueArgs
                             {
                                 Paths = new[]
                                 {
                                     new HTTPIngressPathArgs
                                     {
-                                        Path = "/",
                                         Backend = new IngressBackendArgs
                                         {
-                                            ServiceName = webAppService.Metadata.Apply(meta => meta.Name),
-                                            ServicePort = webAppService.Spec.Apply(spec => spec.Ports[0].Port),
+                                            Service = new IngressServiceBackendArgs
+                                            {
+                                                Name = webAppService.Metadata.Apply(meta => meta.Name),
+                                                Port = new ServiceBackendPortArgs
+                                                {
+                                                    Number = webAppService.Spec.Apply(spec => spec.Ports[0].Port),
+                                                },
+                                            },
                                         },
+                                        Path = "/",
+                                        PathType = "Prefix",
                                     },
                                 },
                             },
@@ -356,6 +386,7 @@ class Program
             }, new CustomResourceOptions
             {
                 Provider = eksProvider,
+                DependsOn = nginxIngress,
             });
 
             // Export the ECR, EKS cluster information
