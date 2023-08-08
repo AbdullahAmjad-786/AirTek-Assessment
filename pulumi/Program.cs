@@ -116,18 +116,6 @@ class Program
                 Provider = eksProvider,
             }) ;
 
-            // Kubernetes namespace for the Ingress Controller
-            var ingressNamespace = new Kubernetes.Core.V1.Namespace("ingress-namespace", new NamespaceArgs
-            {
-                Metadata = new ObjectMetaArgs
-                {
-                    Name = "ingress-controller",
-                },
-            }, new CustomResourceOptions
-            {
-                Provider = eksProvider,
-            });
-
             // Kubernetes namespace for the web app and API
             var webAppNamespace = new Kubernetes.Core.V1.Namespace("airTek-namespace", new NamespaceArgs
             {
@@ -145,11 +133,15 @@ class Program
             {
                  Controller = new nginx.Inputs.ControllerArgs
                  {
-                    // ConfigMapNamespace = ingressNamespace.Metadata.Apply(meta => meta.Name),
                      PublishService = new nginx.Inputs.ControllerPublishServiceArgs
                      {
                          Enabled = true,
                      },
+                 },
+                 HelmOptions = new nginx.Inputs.ReleaseArgs
+                 {
+                     Namespace       = "ingress-controller",
+                     CreateNamespace = true
                  },
             }, new ComponentResourceOptions
             {
